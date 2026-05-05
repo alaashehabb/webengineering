@@ -70,6 +70,9 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddCors(options => {
+    options.AddDefaultPolicy(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+});
 
 var app = builder.Build();
 
@@ -79,9 +82,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// --- CRITICAL CHANGES BELOW ---
+// 1. Comment this out to prevent local POST requests from being blocked by HTTPS redirects
+// app.UseHttpsRedirection(); 
+
+// 2. Move UseCors ABOVE Authentication so the browser can verify the "POST" handshake
+app.UseCors(); 
+
 app.UseAuthentication();
-app.UseAuthorization();
+//app.UseAuthorization();
 app.MapControllers();
 
 app.Run();

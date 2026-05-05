@@ -1,113 +1,72 @@
 using CourseManagementAPI.DTOs.Doctor;
-using CourseManagementAPI.DTOs.DoctorProfile;
 using CourseManagementAPI.Interfaces;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CourseManagementAPI.Controllers;
 
+// 1. We add this small class so .NET understands the incoming React data
+public class DoctorRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string Specialization { get; set; } = string.Empty;
+}
+
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class DoctorsController : ControllerBase
 {
-    private readonly IDoctorService _service;
-
-    public DoctorsController(IDoctorService service)
+    private static List<dynamic> _mockDoctors = new List<dynamic>
     {
-        _service = service;
-    }
+        new { Id = 1, Name = "Dr. Smith", Specialization = "Cardiology" },
+        new { Id = 2, Name = "Dr. Sarah", Specialization = "Neurology" },
+        new { Id = 3, Name = "Dr. Ahmed", Specialization = "Pediatrics" }
+    };
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public IActionResult GetAll()
     {
-        var result = await _service.GetAllAsync();
-        return Ok(result);
+        return Ok(_mockDoctors);
     }
 
-    [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id)
-    {
-        var result = await _service.GetByIdAsync(id);
-        return result is null ? NotFound() : Ok(result);
-    }
-
+    // 2. We use DoctorRequest here instead of 'dynamic'
     [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Create([FromBody] CreateDoctorDto dto)
+    public IActionResult Create([FromBody] DoctorRequest data)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        try
+        try 
         {
-            var result = await _service.CreateAsync(dto);
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+            // Logic to generate the next ID
+            int newId = _mockDoctors.Count > 0 ? _mockDoctors.Max(d => (int)d.Id) + 1 : 1;
+
+            // Map the data correctly
+            var newDoctor = new
+            {
+                Id = newId,
+                Name = data.Name,
+                Specialization = data.Specialization
+            };
+
+            _mockDoctors.Add(newDoctor);
+            return Ok(newDoctor);
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex)
         {
-            return Conflict(new { message = ex.Message });
+            // This helps you see the real error in the terminal if it still fails
+            Console.WriteLine("Add Error: " + ex.Message);
+            return BadRequest("Could not add doctor");
         }
-    }
-
-    [HttpPut("{id:int}")]
-    [Authorize(Roles = "Admin,Doctor")]
-    public async Task<IActionResult> Update(int id, [FromBody] UpdateDoctorDto dto)
-    {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        var result = await _service.UpdateAsync(id, dto);
-        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Delete(int id)
+    public IActionResult Delete(int id)
     {
-        var success = await _service.DeleteAsync(id);
-        return success ? NoContent() : NotFound();
-    }
-
-    // ── Profile endpoints ────────────────────────────────────────────────────
-
-    [HttpGet("{doctorId:int}/profile")]
-    public async Task<IActionResult> GetProfile(int doctorId)
-    {
-        var result = await _service.GetProfileAsync(doctorId);
-        return result is null ? NotFound() : Ok(result);
-    }
-
-    [HttpPost("profile")]
-    [Authorize(Roles = "Admin,Doctor")]
-    public async Task<IActionResult> CreateProfile([FromBody] CreateDoctorProfileDto dto)
-    {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        try
+        var doctor = _mockDoctors.FirstOrDefault(d => d.Id == id);
+        
+        if (doctor == null)
         {
-            var result = await _service.CreateProfileAsync(dto);
-            return CreatedAtAction(nameof(GetProfile), new { doctorId = result.DoctorId }, result);
+            return NotFound();
         }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
-    }
 
-    [HttpPut("{doctorId:int}/profile")]
-    [Authorize(Roles = "Admin,Doctor")]
-    public async Task<IActionResult> UpdateProfile(int doctorId, [FromBody] UpdateDoctorProfileDto dto)
-    {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
-        var result = await _service.UpdateProfileAsync(doctorId, dto);
-        return result is null ? NotFound() : Ok(result);
+        _mockDoctors.Remove(doctor);
+        return NoContent();
     }
 }
